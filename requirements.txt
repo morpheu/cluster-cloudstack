@@ -1,1 +1,1 @@
-cloudmonkey
+cloudmonkey==5.0.0
