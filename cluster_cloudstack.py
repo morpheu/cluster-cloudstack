@@ -73,10 +73,25 @@ def _list_networks(network_name=None):
         return networks
     for network in virtual_networks['listnetworksresponse']['network']:
         name = network['name']
-        networks[name] = {'cidr': network['cidr'], 'id': network['id'], 'zoneid': network['zoneid']}
+        networks[name] = {'cidr': network['cidr'], 'id': network['id'], 'zoneid': network['zoneid'],
+                          'zonename': network['zonename']}
     if network_name is not None:
         return [{network:networks[network]} for network in networks.keys() if network_name.lower() in network.lower()]
     return networks
+
+def _list_os_templates(template_name=None):
+    machine_templates = cloudstack_request.make_request('listTemplates', {'templatefilter': 'self'})
+    templates = []
+    if not 'template' in machine_templates['listtemplatesresponse']:
+        sys.stderr.write('Empty templates list. Maybe wrong or empty projectid? \n')
+        return templates
+    for template in machine_templates['listtemplatesresponse']['template']:
+        templates.append({'name': template['name'], 'displaytext': template['displaytext'],
+                          'zoneid': template['zoneid'], 'id': template['id'],
+                          'ostypename': template['ostypename'], 'zonename': template['zonename']})
+    if template_name is not None:
+        return [template for template in templates if template_name.lower() in template['name'].lower()]
+    return templates
 
 def list_machines(args):
     machines = _get_machines_ips()
@@ -88,6 +103,19 @@ def list_networks(args):
     for name in sorted(networks):
         print "{:50s} {}".format(name, networks[name]['cidr'])
 
+def list_os_templates(args):
+    templates = _list_os_templates()
+    print "{:35s} {:35s} {:36s} {:36s}".format("Template Description", "OS Type", "Template ID", "Zone Name")
+    for template in sorted(templates, key=lambda k: k['displaytext']):
+        print "{:35s} {:35s} {:36s} {:36s}".format(template['displaytext'], template['ostypename'],
+                                                   template['id'], template['zonename'])
+
+def template_info(args):
+    if len(args) == 0:
+        sys.stderr.write(__file__ + " template_info <template_name>\n")
+        sys.stderr.write("Missing network name\n")
+        sys.exit(2) 
+
 def network_info(args):
     if len(args) == 0:
         sys.stderr.write(__file__ + " network_info <network_name>\n")
@@ -95,13 +123,12 @@ def network_info(args):
         sys.exit(2)
     network_name = args[0]
     networks = _list_networks(network_name)
-    print "{:50s} {:18s} {:36s} {:36s}".format("Network Name", "CIDR", "Network ID", "Zone ID")
+    print "{:50s} {:18s} {:36s} {:36s}".format("Network Name", "CIDR", "Network ID", "Zone Name")
     for network in sorted(networks):
         network_name = network.keys()[0]
         print "{:50s} {:18s} {:36s} {:36s}".format(network_name, network[network_name]['cidr'],
                                                    network[network_name]['id'],
-                                                   network[network_name]['zoneid'])
-
+                                                   network[network_name]['zonename'])
 
 def get_ips(args):
     if len(args) == 0:
@@ -117,12 +144,27 @@ def get_ips(args):
         sys.exit(0)
     print ' '.join(ips)
 
+def generate_template_parser(args):
+    parser = argparse.ArgumentParser("generate-template")
+    parser.add_argument("-t", "--template", required=True, help="OS Template id")
+    parser.add_argument("-n", "--network", required=True, help="Network name prefix")
+    parser.add_argument("-o", "--service_offering", required=True, help="Service offering machine name")
+    parser.add_argument("-d", "--disk_offering", required=False, help="Disk offering id")
+    parser.add_argument("-s", "--disk_offering_size", required=False, help="Disk offering size - for custom disk size")
+    parsed = parser.parse_args(args)
+    return parsed
+
+def generate_template(args):
+    args = generate_template_parser(args)
+
 def available_commands():
     return {
         "list-machines": list_machines,
         "list-networks": list_networks,
+        "list-os-templates": list_os_templates,
         "get-machines-ips": get_ips,
-        "get-network-info": network_info
+        "get-network-info": network_info,
+        "generate-template": generate_template
     }
 
 def get_command(name):
