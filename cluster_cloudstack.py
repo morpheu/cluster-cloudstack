@@ -49,10 +49,11 @@ class CloudStackRequester(object):
 
 config_fields['user']['projectid'] = ''
 cloudstack_request = CloudStackRequester(config_file)
-virtual_machines = cloudstack_request.make_request('listVirtualMachines')
 
 def _get_machines_ips(machine_name=None):
+    global cloudstack_request
     machines = {}
+    virtual_machines = cloudstack_request.make_request('listVirtualMachines')
     if not 'virtualmachine' in virtual_machines['listvirtualmachinesresponse']:
         sys.stderr.write('Empty virtual machines list. Maybe wrong or empty projectid? \n')
         return machines
@@ -64,10 +65,43 @@ def _get_machines_ips(machine_name=None):
         return machines[machine_name]
     return machines
 
+def _list_networks(network_name=None):
+    virtual_networks = cloudstack_request.make_request('listNetworks')
+    networks = {}
+    if not 'network' in virtual_networks['listnetworksresponse']:
+        sys.stderr.write('Empty networks list. Maybe wrong or empty projectid? \n')
+        return networks
+    for network in virtual_networks['listnetworksresponse']['network']:
+        name = network['name']
+        networks[name] = {'cidr': network['cidr'], 'id': network['id'], 'zoneid': network['zoneid']}
+    if network_name is not None:
+        return [{network:networks[network]} for network in networks.keys() if network_name.lower() in network.lower()]
+    return networks
+
 def list_machines(args):
     machines = _get_machines_ips()
     for (machine, ips) in sorted(machines.items()):
         print machine
+
+def list_networks(args):
+    networks = _list_networks()
+    for name in sorted(networks):
+        print "{:50s} {}".format(name, networks[name]['cidr'])
+
+def network_info(args):
+    if len(args) == 0:
+        sys.stderr.write(__file__ + " network_info <network_name>\n")
+        sys.stderr.write("Missing network name\n")
+        sys.exit(2)
+    network_name = args[0]
+    networks = _list_networks(network_name)
+    print "{:50s} {:18s} {:36s} {:36s}".format("Network Name", "CIDR", "Network ID", "Zone ID")
+    for network in sorted(networks):
+        network_name = network.keys()[0]
+        print "{:50s} {:18s} {:36s} {:36s}".format(network_name, network[network_name]['cidr'],
+                                                   network[network_name]['id'],
+                                                   network[network_name]['zoneid'])
+
 
 def get_ips(args):
     if len(args) == 0:
@@ -86,7 +120,9 @@ def get_ips(args):
 def available_commands():
     return {
         "list-machines": list_machines,
-        "get-ips": get_ips,
+        "list-networks": list_networks,
+        "get-machines-ips": get_ips,
+        "get-network-info": network_info
     }
 
 def get_command(name):
