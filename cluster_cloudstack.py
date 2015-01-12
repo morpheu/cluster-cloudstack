@@ -50,6 +50,7 @@ class CloudStackRequester(object):
 config_fields['user']['projectid'] = ''
 cloudstack_request = CloudStackRequester(config_file)
 
+
 def _get_machines_ips(machine_name=None):
     global cloudstack_request
     machines = {}
@@ -66,20 +67,21 @@ def _get_machines_ips(machine_name=None):
     return machines
 
 def _list_networks(network_name=None):
+    global cloudstack_request
     virtual_networks = cloudstack_request.make_request('listNetworks')
-    networks = {}
+    networks = []
     if not 'network' in virtual_networks['listnetworksresponse']:
         sys.stderr.write('Empty networks list. Maybe wrong or empty projectid? \n')
         return networks
     for network in virtual_networks['listnetworksresponse']['network']:
-        name = network['name']
-        networks[name] = {'cidr': network['cidr'], 'id': network['id'], 'zoneid': network['zoneid'],
-                          'zonename': network['zonename']}
+        networks.append({'name': network['name'], 'cidr': network['cidr'], 'id': network['id'],
+                         'zoneid': network['zoneid'], 'zonename': network['zonename']})
     if network_name is not None:
-        return [{network:networks[network]} for network in networks.keys() if network_name.lower() in network.lower()]
+        return [network for network in networks if network_name.lower() in network['name'].lower()]
     return networks
 
 def _list_os_templates(template_name=None):
+    global cloudstack_request
     machine_templates = cloudstack_request.make_request('listTemplates', {'templatefilter': 'self'})
     templates = []
     if not 'template' in machine_templates['listtemplatesresponse']:
@@ -93,6 +95,19 @@ def _list_os_templates(template_name=None):
         return [template for template in templates if template_name.lower() in template['name'].lower()]
     return templates
 
+def _list_service_offering(offering_name=None):
+    global cloudstack_request
+    vm_offerings = cloudstack_request.make_request('listServiceOfferings')
+    service_offerings = []
+    if not 'serviceoffering' in vm_offerings['listserviceofferingsresponse']:
+        sys.stderr.write('Empty service offering list. Maybe wrong or empry projectid? \n')
+        return service_offerings
+    for vm in vm_offerings['listserviceofferingsresponse']['serviceoffering']:
+        service_offerings.append({'name': vm['name'], 'displaytext': vm['displaytext'], 'id': vm['id']})
+    if offering_name is not None:
+        return [offering for offering in service_offerings if offering_name.lower() in offering['name'].lower()]
+    return service_offerings
+
 def list_machines(args):
     machines = _get_machines_ips()
     for (machine, ips) in sorted(machines.items()):
@@ -100,8 +115,8 @@ def list_machines(args):
 
 def list_networks(args):
     networks = _list_networks()
-    for name in sorted(networks):
-        print "{:50s} {}".format(name, networks[name]['cidr'])
+    for network in sorted(networks, key=lambda k: k['name']):
+        print "{:50s} {}".format(network['name'], network['cidr'])
 
 def list_os_templates(args):
     templates = _list_os_templates()
@@ -124,11 +139,9 @@ def network_info(args):
     network_name = args[0]
     networks = _list_networks(network_name)
     print "{:50s} {:18s} {:36s} {:36s}".format("Network Name", "CIDR", "Network ID", "Zone Name")
-    for network in sorted(networks):
-        network_name = network.keys()[0]
-        print "{:50s} {:18s} {:36s} {:36s}".format(network_name, network[network_name]['cidr'],
-                                                   network[network_name]['id'],
-                                                   network[network_name]['zonename'])
+    for network in sorted(networks, key=lambda k: k['name']):
+        print "{:50s} {:18s} {:36s} {:36s}".format(network['name'], network['cidr'],
+                                                   network['id'], network['zonename'])
 
 def get_ips(args):
     if len(args) == 0:
@@ -146,16 +159,35 @@ def get_ips(args):
 
 def generate_template_parser(args):
     parser = argparse.ArgumentParser("generate-template")
-    parser.add_argument("-t", "--template", required=True, help="OS Template id")
-    parser.add_argument("-n", "--network", required=True, help="Network name prefix")
+    parser.add_argument("template", nargs=1, help="Template name")
+    parser.add_argument("-t", "--os_template_id", required=True, help="OS Template id")
+    parser.add_argument("-n", "--network_name", required=True, help="Network name prefix")
     parser.add_argument("-o", "--service_offering", required=True, help="Service offering machine name")
-    parser.add_argument("-d", "--disk_offering", required=False, help="Disk offering id")
-    parser.add_argument("-s", "--disk_offering_size", required=False, help="Disk offering size - for custom disk size")
+    parser.add_argument("-d", "--disk_offering_id", default=None, required=False, help="Disk offering id")
+    parser.add_argument("-s", "--disk_offering_size", default=None, required=False, help="Disk offering size - for custom disk size")
     parsed = parser.parse_args(args)
     return parsed
 
 def generate_template(args):
+    global cloudstack_request
     args = generate_template_parser(args)
+    template_name = args.template[0]
+    os_template_id = args.os_template_id
+    networks = _list_networks(args.network_name)
+    service_offering = _list_service_offering(args.service_offering)[0]
+    project_id = cloudstack_request.get_attr('projectid')
+    disk_offering_id = args.disk_offering_id
+    disk_offering_size = args.disk_offering_size
+    for network in networks:
+        template_line = "projectid={} displayname={} networkids={} templateid={} \
+                         serviceofferingid={} zoneid={}".format(project_id, template_name, network['id'],
+                                                                os_template_id, service_offering['id'],
+                                                                network['zoneid'])
+        if disk_offering_id is not None:
+            template_line += " diskofferingid={}".format(disk_offering_id)
+        if disk_offering_size is not None:
+            template_line += " size={}".format(disk_offering_size)
+        print template_line
 
 def available_commands():
     return {
