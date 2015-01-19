@@ -125,6 +125,12 @@ def list_os_templates(args):
         print "{:35s} {:35s} {:36s} {:36s}".format(template['displaytext'], template['ostypename'],
                                                    template['id'], template['zonename'])
 
+def list_service_offerings(args):
+    service_offering = _list_service_offering()
+    print "{:25s} {:30s} {:30s}".format("Offering Name", "Description", "Id")
+    for offering in sorted(service_offering, key=lambda k: k['name']):
+        print "{:25s} {:30s} {:30s}".format(offering['name'], offering['displaytext'], offering['id'])
+
 def template_info(args):
     if len(args) == 0:
         sys.stderr.write(__file__ + " template_info <template_name>\n")
@@ -179,10 +185,11 @@ def generate_template(args):
     disk_offering_id = args.disk_offering_id
     disk_offering_size = args.disk_offering_size
     for network in networks:
-        template_line = "projectid={} displayname={} networkids={} templateid={} \
-                         serviceofferingid={} zoneid={}".format(project_id, template_name, network['id'],
-                                                                os_template_id, service_offering['id'],
-                                                                network['zoneid'])
+        template_line = """
+projectid={} displayname={} networkids={} templateid={} serviceofferingid={} zoneid={}"""
+        template_line = template_line.format(project_id, template_name, network['id'],
+                                             os_template_id, service_offering['id'],
+                                             network['zoneid'])
         if disk_offering_id is not None:
             template_line += " diskofferingid={}".format(disk_offering_id)
         if disk_offering_size is not None:
@@ -194,6 +201,7 @@ def available_commands():
         "list-machines": list_machines,
         "list-networks": list_networks,
         "list-os-templates": list_os_templates,
+        "list-service-offerings": list_service_offerings,
         "get-machines-ips": get_ips,
         "get-network-info": network_info,
         "generate-template": generate_template
