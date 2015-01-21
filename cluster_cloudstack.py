@@ -186,8 +186,8 @@ def generate_template(args):
     disk_offering_size = args.disk_offering_size
     for network in networks:
         template_line = """
-projectid={} displayname={} networkids={} templateid={} serviceofferingid={} zoneid={}"""
-        template_line = template_line.format(project_id, template_name, network['id'],
+{} projectid={} displayname={} networkids={} templateid={} serviceofferingid={} zoneid={}"""
+        template_line = template_line.format(network['zonename'], project_id, template_name, network['id'],
                                              os_template_id, service_offering['id'],
                                              network['zoneid'])
         if disk_offering_id is not None:
