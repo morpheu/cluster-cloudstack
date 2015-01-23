@@ -6,6 +6,7 @@ import os
 import sys
 import logging
 import argparse
+import base64
 logger = logging.getLogger(__name__)
 
 class CommandNotFoundError(Exception):
@@ -51,7 +52,7 @@ config_fields['user']['projectid'] = ''
 cloudstack_request = CloudStackRequester(config_file)
 
 
-def _get_machines_ips(machine_name=None):
+def _get_machines_data(machine_name=None):
     global cloudstack_request
     machines = {}
     virtual_machines = cloudstack_request.make_request('listVirtualMachines')
@@ -61,7 +62,7 @@ def _get_machines_ips(machine_name=None):
     for machine in virtual_machines['listvirtualmachinesresponse']['virtualmachine']:
         if not machine['displayname'] in machines:
             machines[machine['displayname']] = []
-        machines[machine['displayname']].append(machine['nic'][0]['ipaddress'])
+        machines[machine['displayname']].append((machine['id'], machine['nic'][0]['ipaddress']))
     if machine_name in machines:
         return machines[machine_name]
     return machines
@@ -109,9 +110,9 @@ def _list_service_offering(offering_name=None):
     return service_offerings
 
 def list_machines(args):
-    machines = _get_machines_ips()
-    for (machine, ips) in sorted(machines.items()):
-        print machine
+    machines = _get_machines_data()
+    for (machine_name, machine_data) in sorted(machines.items()):
+        print machine_name
 
 def list_networks(args):
     networks = _list_networks()
@@ -154,7 +155,8 @@ def get_ips(args):
         sys.stderr.write(__file__ + " get-ips <machine_name> [-o]\n")
         sys.stderr.write("Missing machine name\n")
         sys.exit(2)
-    ips = _get_machines_ips(args[0])
+    machine_data = _get_machines_data(args[0])
+    ips = [machine_ip for machine_id, machine_ip in machine_data]
     if type(ips) is dict:
         sys.stderr.write("Machine not found\n")
         sys.exit(1)
@@ -196,6 +198,41 @@ def generate_template(args):
             template_line += " size={}".format(disk_offering_size)
         print template_line
 
+def update_machine_parser(args):
+    parser = argparse.ArgumentParser("update-machine")
+    parser.add_argument("-i", "--machine_id", default=None, required=False, help="Only update this machine id")
+    parser.add_argument("-m", "--machine_name", required=True, help="Machine display name")
+    parser.add_argument("-f", "--user_data_file", required=True, help="User data file")
+    parsed = parser.parse_args(args)
+    return parsed
+
+def b64_encoded(file_path):
+    with open (file_path, "r") as f:
+        data=f.read()
+        f.close
+    encoded_file = base64.b64encode(data)
+    return encoded_file
+
+def _update_machine_userdata(machine_id, user_data):
+    global cloudstack_request
+    updated_machine = cloudstack_request.make_request('updateVirtualMachine', 
+                                                        {'id': machine_id, 'userdata': user_data})
+    if machine_id in updated_machine['updatevirtualmachineresponse']['virtualmachine']['id']:
+        machine_display_name = updated_machine['updatevirtualmachineresponse']['virtualmachine']['displayname']
+        print "Userdata for virtual machine {} with {} ID updated".format(machine_display_name, machine_id)
+
+def update_machine_userdata(args):
+    args = update_machine_parser(args)
+    machine_data = _get_machines_data(args.machine_name)
+    if isinstance(machine_data, dict):
+        sys.stderr.write("Machine {} not found\n".format(args.machine_name))
+        sys.exit(1)
+    encoded_user_data = b64_encoded(args.user_data_file)
+    for machine_id, machine_ip in machine_data:
+        if args.machine_id is not None and machine_id != args.machine_id:
+            continue
+        _update_machine_userdata(machine_id, encoded_user_data)
+
 def available_commands():
     return {
         "list-machines": list_machines,
@@ -204,7 +241,8 @@ def available_commands():
         "list-service-offerings": list_service_offerings,
         "get-machines-ips": get_ips,
         "get-network-info": network_info,
-        "generate-template": generate_template
+        "generate-template": generate_template,
+        "update-machine-userdata": update_machine_userdata
     }
 
 def get_command(name):
