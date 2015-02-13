@@ -52,19 +52,22 @@ config_fields['user']['projectid'] = ''
 cloudstack_request = CloudStackRequester(config_file)
 
 
-def _get_machines_data(machine_name=None):
+def _get_machines_data(search_item=None):
     global cloudstack_request
-    machines = {}
+    machines = []
     virtual_machines = cloudstack_request.make_request('listVirtualMachines')
+    search_result = []
     if not 'virtualmachine' in virtual_machines['listvirtualmachinesresponse']:
         sys.stderr.write('Empty virtual machines list. Maybe wrong or empty projectid? \n')
         return machines
     for machine in virtual_machines['listvirtualmachinesresponse']['virtualmachine']:
-        if not machine['displayname'] in machines:
-            machines[machine['displayname']] = []
-        machines[machine['displayname']].append((machine['id'], machine['nic'][0]['ipaddress']))
-    if machine_name in machines:
-        return machines[machine_name]
+        machine_data = {'name': machine['displayname'], 'id': machine['id'],
+                        'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename']}
+        machines.append(machine_data)
+        if search_item.lower() in [item.lower() for item in machine_data.values()]:
+            search_result.append(machine_data)
+    if search_result != [] or search_item is not None:
+        return search_result
     return machines
 
 def _list_networks(network_name=None):
@@ -111,8 +114,20 @@ def _list_service_offering(offering_name=None):
 
 def list_machines(args):
     machines = _get_machines_data()
-    for (machine_name, machine_data) in sorted(machines.items()):
+    for machine_name in sorted(set([machine['name'] for machine in machines])):
         print machine_name
+
+def get_machine_info(args):
+    if len(args) == 0:
+        sys.stderr.write(__file__ + " machine-info <display_name>\n")
+        sys.stderr.write("Missing machine name\n")
+        sys.exit(2)
+    search_item = args[0]
+    machines = _get_machines_data(search_item)
+    print "{:50s} {:18s} {:36s} {:36s}".format("Display Name", "IP Address", "VM ID", "Zone Name")
+    for machine in sorted(machines, key=lambda k: k['name']):
+        print "{:50s} {:18s} {:36s} {:36s}".format(machine['name'], machine['ipaddress'],
+                                                   machine['id'], machine['zonename'])
 
 def list_networks(args):
     networks = _list_networks()
@@ -156,8 +171,8 @@ def get_ips(args):
         sys.stderr.write("Missing machine name\n")
         sys.exit(2)
     machine_data = _get_machines_data(args[0])
-    ips = [machine_ip for machine_id, machine_ip in machine_data]
-    if type(ips) is dict:
+    ips = [machine['ipaddress'] for machine in machine_data if machine['name'] == args[0]]
+    if ips == []:
         sys.stderr.write("Machine not found\n")
         sys.exit(1)
     if '-o' in args:
@@ -203,6 +218,7 @@ def update_machine_parser(args):
     parser.add_argument("-i", "--machine_id", default=None, required=False, help="Only update this machine id")
     parser.add_argument("-m", "--machine_name", required=True, help="Machine display name")
     parser.add_argument("-f", "--user_data_file", required=True, help="User data file")
+    parser.add_argument("-d", "--dry_run", required=False, action='store_true', help="Dry run mode")
     parsed = parser.parse_args(args)
     return parsed
 
@@ -224,14 +240,20 @@ def _update_machine_userdata(machine_id, user_data):
 def update_machine_userdata(args):
     args = update_machine_parser(args)
     machine_data = _get_machines_data(args.machine_name)
-    if isinstance(machine_data, dict):
+    if machine_data == []:
         sys.stderr.write("Machine {} not found\n".format(args.machine_name))
         sys.exit(1)
     encoded_user_data = b64_encoded(args.user_data_file)
-    for machine_id, machine_ip in machine_data:
+    changed_user_data = False
+    for machine_id in [machine['id'] for machine in machine_data]:
         if args.machine_id is not None and machine_id != args.machine_id:
             continue
-        _update_machine_userdata(machine_id, encoded_user_data)
+        changed_user_data = True
+        print "Update userdata on {} with id {}".format(args.machine_name, machine_id)
+        if not args.dry_run:
+            _update_machine_userdata(machine_id, encoded_user_data)
+    if not changed_user_data:
+        print "No machine found for {} id on {}".format(args.machine_id, args.machine_name)
 
 def available_commands():
     return {
@@ -241,6 +263,7 @@ def available_commands():
         "list-service-offerings": list_service_offerings,
         "get-machines-ips": get_ips,
         "get-network-info": network_info,
+        "get-machine-info": get_machine_info,
         "generate-template": generate_template,
         "update-machine-userdata": update_machine_userdata
     }
