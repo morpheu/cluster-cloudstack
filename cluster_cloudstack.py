@@ -64,7 +64,7 @@ def _get_machines_data(search_item=None):
         machine_data = {'name': machine['displayname'], 'id': machine['id'],
                         'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename']}
         machines.append(machine_data)
-        if search_item.lower() in [item.lower() for item in machine_data.values()]:
+        if search_item in [item for item in machine_data.values()]:
             search_result.append(machine_data)
     if search_result != [] or search_item is not None:
         return search_result
@@ -119,13 +119,13 @@ def list_machines(args):
 
 def get_machine_info(args):
     if len(args) == 0:
-        sys.stderr.write(__file__ + " machine-info <display_name>\n")
-        sys.stderr.write("Missing machine name\n")
+        sys.stderr.write(__file__ + " machine-info <display_name|ipaddress|zonename|vm id>\n")
+        sys.stderr.write("Missing required search term\n")
         sys.exit(2)
     search_item = args[0]
     machines = _get_machines_data(search_item)
     print "{:50s} {:18s} {:36s} {:36s}".format("Display Name", "IP Address", "VM ID", "Zone Name")
-    for machine in sorted(machines, key=lambda k: k['name']):
+    for machine in sorted(machines, key=lambda k: k['zonename']):
         print "{:50s} {:18s} {:36s} {:36s}".format(machine['name'], machine['ipaddress'],
                                                    machine['id'], machine['zonename'])
 
