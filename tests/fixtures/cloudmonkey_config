@@ -1,0 +1,9 @@
+[foobar]
+url = http://foo.bar:8080/client/api
+apikey = 123456
+secretkey = abcdef
+
+[lab]
+url = http://lab.org/client/api
+apikey = qwerty
+secretkey = password!

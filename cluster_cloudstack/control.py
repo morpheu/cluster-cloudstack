@@ -1,13 +1,10 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-from cloudmonkey.config import config_file, read_config, config_fields
-from cloudmonkey.requester import monkeyrequest
 import os
 import sys
-import logging
 import argparse
 import base64
-logger = logging.getLogger(__name__)
+from cluster import Cloudstack
 
 class CommandNotFoundError(Exception):
 
@@ -21,31 +18,6 @@ class CommandNotFoundError(Exception):
     def __unicode__(self):
         return unicode(str(self))
 
-class CloudStackRequester(object):
-
-    def __init__(self, cfile):
-        self.config_file = cfile
-        self.config_options = read_config(self.get_attr, self.set_attr,
-                                          self.config_file)
-
-    def get_attr(self, field):
-        return getattr(self, field)
-
-    def set_attr(self, field, value):
-        return setattr(self, field, value)  
-
-    def make_request(self, command, args={}, isasync=False):
-        if self.projectid is not None:
-            args['projectid'] =  self.projectid
-        response, error = monkeyrequest(command, args, isasync,
-                                        self.asyncblock, logger,
-                                        self.host, self.port,
-                                        self.apikey, self.secretkey,
-                                        self.timeout, self.protocol, self.path)
-        if error is not None:
-            sys.stderr.write(error + '\n')
-            sys.exit(1)
-        return response
 
 
 config_fields['user']['projectid'] = ''
