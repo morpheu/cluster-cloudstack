@@ -31,6 +31,17 @@ class TestCloudStack(unittest.TestCase):
         self.assertRaisesRegexp(CloudMonkeyRegionError, "No section: 'test'", CloudStack, "test")
 
     @patch('__builtin__.open')
+    def test_make_request_with_optional_projectid(self, open_mock):
+        open_mock.return_value = self.cloudmonkey_file
+        response_data = '{"foocallresponse":{}}'
+        self.urlopen_mock.return_value = FakeURLopenResponse(response_data)
+        cloudstack_handler = CloudStack('lab')
+        cloudstack_handler.foocall()
+        expected_call = self.urlopen_mock.call_args[0][0]
+        self.assertIn("projectid=abcde12345", expected_call)
+        self.assertEqual(self.urlopen_mock.call_count, 1)
+
+    @patch('__builtin__.open')
     def test_get_all_machine_data(self, open_mock):
         open_mock.return_value = self.cloudmonkey_file
         response_data = self.virtualmachines_file.read()

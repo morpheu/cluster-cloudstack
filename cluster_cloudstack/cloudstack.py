@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from connector import CloudStackRequester
-from ConfigParser import RawConfigParser, NoSectionError
+from ConfigParser import RawConfigParser, NoSectionError, NoOptionError
 import os
 import sys
 
@@ -32,13 +32,19 @@ class CloudStack(CloudStackRequester):
             self.apikey = parser.get(region, 'apikey')
             self.api_url = parser.get(region, 'url')
             self.secretkey = parser.get(region, 'secretkey')
+            self.projectid = parser.get(region, 'projectid')
         except NoSectionError, e:
             raise CloudMonkeyRegionError(e.message)
+        except NoOptionError, e:
+            if "projectid" in e.message:
+                self.projectid = None
+            else:
+                raise e
         except OSError, e:
             raise e
         except Exception, e:
             raise e
-        super(CloudStack, self).__init__(self.apikey, self.api_url, self.secretkey)
+        super(CloudStack, self).__init__(self.apikey, self.api_url, self.secretkey, self.projectid)
 
     def get_machines_data(self, search_item=None):
         machines = []

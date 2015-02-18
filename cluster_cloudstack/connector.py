@@ -11,10 +11,11 @@ import json
 
 
 class SignedAPICall(object):
-    def __init__(self, api_url, apiKey, secret):
+    def __init__(self, api_url, apiKey, secret, projectid=None):
         self.api_url = api_url
         self.apiKey = apiKey
         self.secret = secret
+        self.projectid = projectid
 
     def request(self, args):
         args['apiKey'] = self.apiKey
@@ -25,6 +26,8 @@ class SignedAPICall(object):
         self._build_post_request()
 
     def _sort_request(self, args):
+        if self.projectid is not None:
+            args['projectid'] = self.projectid
         keys = sorted(args.keys())
 
         for key in keys:

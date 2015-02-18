@@ -7,3 +7,4 @@ secretkey = abcdef
 url = http://lab.org/client/api
 apikey = qwerty
 secretkey = password!
+projectid = abcde12345
