@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import os
 import sys
 import argparse
 import base64
-from cluster import Cloudstack
+
 
 class CommandNotFoundError(Exception):
 
@@ -18,71 +17,6 @@ class CommandNotFoundError(Exception):
     def __unicode__(self):
         return unicode(str(self))
 
-
-
-config_fields['user']['projectid'] = ''
-cloudstack_request = CloudStackRequester(config_file)
-
-
-def _get_machines_data(search_item=None):
-    global cloudstack_request
-    machines = []
-    virtual_machines = cloudstack_request.make_request('listVirtualMachines')
-    search_result = []
-    if not 'virtualmachine' in virtual_machines['listvirtualmachinesresponse']:
-        sys.stderr.write('Empty virtual machines list. Maybe wrong or empty projectid? \n')
-        return machines
-    for machine in virtual_machines['listvirtualmachinesresponse']['virtualmachine']:
-        machine_data = {'name': machine['displayname'], 'id': machine['id'],
-                        'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename']}
-        machines.append(machine_data)
-        if search_item in [item for item in machine_data.values()]:
-            search_result.append(machine_data)
-    if search_result != [] or search_item is not None:
-        return search_result
-    return machines
-
-def _list_networks(network_name=None):
-    global cloudstack_request
-    virtual_networks = cloudstack_request.make_request('listNetworks')
-    networks = []
-    if not 'network' in virtual_networks['listnetworksresponse']:
-        sys.stderr.write('Empty networks list. Maybe wrong or empty projectid? \n')
-        return networks
-    for network in virtual_networks['listnetworksresponse']['network']:
-        networks.append({'name': network['name'], 'cidr': network['cidr'], 'id': network['id'],
-                         'zoneid': network['zoneid'], 'zonename': network['zonename']})
-    if network_name is not None:
-        return [network for network in networks if network_name.lower() in network['name'].lower()]
-    return networks
-
-def _list_os_templates(template_name=None):
-    global cloudstack_request
-    machine_templates = cloudstack_request.make_request('listTemplates', {'templatefilter': 'self'})
-    templates = []
-    if not 'template' in machine_templates['listtemplatesresponse']:
-        sys.stderr.write('Empty templates list. Maybe wrong or empty projectid? \n')
-        return templates
-    for template in machine_templates['listtemplatesresponse']['template']:
-        templates.append({'name': template['name'], 'displaytext': template['displaytext'],
-                          'zoneid': template['zoneid'], 'id': template['id'],
-                          'ostypename': template['ostypename'], 'zonename': template['zonename']})
-    if template_name is not None:
-        return [template for template in templates if template_name.lower() in template['name'].lower()]
-    return templates
-
-def _list_service_offering(offering_name=None):
-    global cloudstack_request
-    vm_offerings = cloudstack_request.make_request('listServiceOfferings')
-    service_offerings = []
-    if not 'serviceoffering' in vm_offerings['listserviceofferingsresponse']:
-        sys.stderr.write('Empty service offering list. Maybe wrong or empry projectid? \n')
-        return service_offerings
-    for vm in vm_offerings['listserviceofferingsresponse']['serviceoffering']:
-        service_offerings.append({'name': vm['name'], 'displaytext': vm['displaytext'], 'id': vm['id']})
-    if offering_name is not None:
-        return [offering for offering in service_offerings if offering_name.lower() in offering['name'].lower()]
-    return service_offerings
 
 def list_machines(args):
     machines = _get_machines_data()
