@@ -1,0 +1,46 @@
+{
+    "listvirtualmachinesresponse": {
+        "virtualmachine": [
+            {
+                "displayname": "test1",
+                "id": "123",
+                "nic": [
+                    {
+                        "ipaddress": "10.2.3.2"
+                    }
+                ],
+                "zonename": "red"
+            },
+            {
+                "displayname": "test2",
+                "id": "456",
+                "nic": [
+                    {
+                        "ipaddress": "10.1.2.2"
+                    }
+                ],
+                "zonename": "blue"
+            },
+            {
+                "displayname": "test2",
+                "id": "987",
+                "nic": [
+                    {
+                        "ipaddress": "10.1.2.3"
+                    }
+                ],
+                "zonename": "blue"
+            },
+            {
+                "displayname": "test3",
+                "id": "789",
+                "nic": [
+                    {
+                        "ipaddress": "10.2.3.4"
+                    }
+                ],
+                "zonename": "red"
+            }
+        ]
+    }
+}
