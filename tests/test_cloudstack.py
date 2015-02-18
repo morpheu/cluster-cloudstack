@@ -12,28 +12,50 @@ class TestCloudStack(unittest.TestCase):
         self.urlopen_mock = self.urlopen_patcher.start()
         self.fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
         self.cloudmonkey_file = open(os.path.join(self.fixtures_dir, 'cloudmonkey_config'), 'r')
-        self.open_patcher = patch('__builtin__.open')
-        self.open_mock = self.open_patcher.start()
+        self.virtualmachines_file = open(os.path.join(self.fixtures_dir, 'virtualmachines.json'), 'r')
 
     def tearDown(self):
         self.urlopen_patcher.stop()
-        self.open_patcher.stop()
 
+    @patch('__builtin__.open')
     @patch('os.path.expanduser')
-    def test_failed_to_find_cloudmonkey_config(self, os_expand_path):
-        self.open_mock.side_effect = IOError("no such file or directory: cloudmonkey_config")
+    def test_failed_to_find_cloudmonkey_config(self, os_expand_path, open_mock):
+        open_mock.side_effect = IOError("no such file or directory: cloudmonkey_config")
         os_expand_path.return_value = '/user/path/.cloudmonkey/config'
         self.assertRaisesRegexp(OSError, "File /user/path/.cloudmonkey/config was not found",
                                 CloudStack, "foobar")
 
-    def test_failed_to_find_test_region(self):
-        self.open_mock.return_value = self.cloudmonkey_file
+    @patch('__builtin__.open')
+    def test_failed_to_find_test_region(self, open_mock):
+        open_mock.return_value = self.cloudmonkey_file
         self.assertRaisesRegexp(CloudMonkeyRegionError, "No section: 'test'", CloudStack, "test")
 
-    def test_get_all_machine_data(self):
-        self.open_mock.return_value = self.cloudmonkey_file
-        response_data = '{"listvirtualmachines":[{"displayname": "test1", "id": "123", "nic":[{"ipaddress":"10.2.3.2"}], "zonename":"red"}]}'
+    @patch('__builtin__.open')
+    def test_get_all_machine_data(self, open_mock):
+        open_mock.return_value = self.cloudmonkey_file
+        response_data = self.virtualmachines_file.read()
         self.urlopen_mock.return_value = FakeURLopenResponse(response_data)
         cloudstack_handler = CloudStack('foobar')
         machine_data = cloudstack_handler.get_machines_data()
-        self.assertEqual(machine_data, {'name': 'test1', 'id': '123', 'ipaddress': '10.2.3.2', 'zonename': 'red'})
+        expected_response_data = [{'zonename': u'red', 'ipaddress': u'10.2.3.2', 'name': u'test1',
+                                   'id': u'123'},
+                                  {'zonename': u'blue', 'ipaddress': u'10.1.2.2', 'name': u'test2',
+                                   'id': u'456'},
+                                  {'zonename': u'blue', 'ipaddress': u'10.1.2.3', 'name': u'test2',
+                                   'id': u'987'},
+                                  {'zonename': u'red', 'ipaddress': u'10.2.3.4', 'name': u'test3',
+                                   'id': u'789'}]
+        self.assertEqual(machine_data, expected_response_data)
+
+    @patch('__builtin__.open')
+    def test_get_only_red_zone_on_machine_data(self, open_mock):
+        open_mock.return_value = self.cloudmonkey_file
+        response_data = self.virtualmachines_file.read()
+        self.urlopen_mock.return_value = FakeURLopenResponse(response_data)
+        cloudstack_handler = CloudStack('foobar')
+        machine_data = cloudstack_handler.get_machines_data("red")
+        expected_response_data = [{'zonename': u'red', 'ipaddress': u'10.2.3.2', 'name': u'test1',
+                                   'id': u'123'},
+                                  {'zonename': u'red', 'ipaddress': u'10.2.3.4', 'name': u'test3',
+                                   'id': u'789'}]
+        self.assertEqual(machine_data, expected_response_data)

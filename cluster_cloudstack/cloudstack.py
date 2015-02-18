@@ -44,10 +44,10 @@ class CloudStack(CloudStackRequester):
         machines = []
         virtual_machines = self.listVirtualMachines()
         search_result = []
-        if 'virtualmachine' not in virtual_machines['listvirtualmachinesresponse']:
+        if 'virtualmachine' not in virtual_machines:
             sys.stderr.write('Empty virtual machines list. Maybe wrong or empty projectid? \n')
             return machines
-        for machine in virtual_machines['listvirtualmachinesresponse']['virtualmachine']:
+        for machine in virtual_machines['virtualmachine']:
             machine_data = {'name': machine['displayname'], 'id': machine['id'],
                             'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename']}
             machines.append(machine_data)
@@ -78,8 +78,8 @@ class CloudStack(CloudStackRequester):
             return templates
         for template in machine_templates['listtemplatesresponse']['template']:
             templates.append({'name': template['name'], 'displaytext': template['displaytext'],
-                              'zoneid': template['zoneid'], 'id': template['id'], 'ostypename': template['ostypename'],
-                              'zonename': template['zonename']})
+                              'zoneid': template['zoneid'], 'id': template['id'],
+                              'ostypename': template['ostypename'], 'zonename': template['zonename']})
         if template_name is not None:
             return [template for template in templates if template_name.lower() in template['name'].lower()]
         return templates

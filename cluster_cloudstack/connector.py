@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import base64
 import urllib2
+import urllib
 import json
 
 
@@ -27,7 +28,7 @@ class SignedAPICall(object):
         keys = sorted(args.keys())
 
         for key in keys:
-            self.params.append(key + '=' + urllib2.quote_plus(args[key]))
+            self.params.append(key + '=' + urllib.quote_plus(args[key]))
 
     def _create_signature(self):
         self.query = '&'.join(self.params)
@@ -39,7 +40,7 @@ class SignedAPICall(object):
         self.signature = base64.b64encode(digest)
 
     def _build_post_request(self):
-        self.query += '&signature=' + urllib2.quote_plus(self.signature)
+        self.query += '&signature=' + urllib.quote_plus(self.signature)
         self.value = self.api_url + '?' + self.query
 
 
@@ -48,7 +49,7 @@ class CloudStackRequester(SignedAPICall):
         def handlerFunction(*args, **kwargs):
             if kwargs:
                 return self._make_request(name, kwargs)
-            return self._make_request(name, args[0])
+            return self._make_request(name, {})
         return handlerFunction
 
     def _http_get(self, url):
