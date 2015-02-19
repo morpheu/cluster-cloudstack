@@ -21,7 +21,7 @@ class CloudMonkeyRegionError(Exception):
 
 class CloudStack(CloudStackRequester):
 
-    def __init__(self, region):
+    def __init__(self, region=None, **kwargs):
         try:
             # import keys from cloudmonkey config
             parser = RawConfigParser()
@@ -29,6 +29,8 @@ class CloudStack(CloudStackRequester):
             parsed_config = parser.read(cloudmonkey_config)
             if len(parsed_config) == 0:
                 raise OSError("File {} was not found".format(cloudmonkey_config))
+            if region is None:
+                region = parser.get('default_region', 'region')
             self.apikey = parser.get(region, 'apikey')
             self.api_url = parser.get(region, 'url')
             self.secretkey = parser.get(region, 'secretkey')
@@ -40,11 +42,43 @@ class CloudStack(CloudStackRequester):
                 self.projectid = None
             else:
                 raise e
-        except OSError, e:
-            raise e
         except Exception, e:
             raise e
+
         super(CloudStack, self).__init__(self.apikey, self.api_url, self.secretkey, self.projectid)
+
+        if 'set_default_region' in kwargs:
+            self.set_config_section('default_region', region=region)
+
+        if 'project_name' in kwargs:
+            self.projectid = self.get_project_id(kwargs['project_name'])
+            if 'set_project_id' in kwargs and self.projectid is not None:
+                self.set_config_section(region, projectid=self.projectid)
+
+    def set_config_section(self, section, **kwargs):
+        try:
+            parser = RawConfigParser()
+            cloudmonkey_config = os.path.expanduser('~/.cloudmonkey/config')
+            parsed_config = parser.read(cloudmonkey_config)
+            if len(parsed_config) == 0:
+                raise OSError("File {} was not found".format(cloudmonkey_config))
+            if not parser.has_section(section):
+                parser.add_section(section)
+            for key in kwargs.keys():
+                parser.set(section, key, kwargs[key])
+            with open(cloudmonkey_config, 'wb') as configfile:
+                parser.write(configfile)
+        except Exception, e:
+            raise e
+
+    def get_project_id(self, project_name):
+        projects = self.listProjects()
+        if 'project' not in projects:
+            return None
+        for project in projects['project']:
+            if project['name'].lower() == project_name.lower():
+                return project['id']
+        return None
 
     def get_machines_data(self, search_item=None):
         machines = []

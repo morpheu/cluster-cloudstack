@@ -2,7 +2,8 @@ import unittest
 import os
 from mock import patch
 from cluster_cloudstack.cloudstack import CloudStack, CloudMonkeyRegionError
-from utils import FakeURLopenResponse
+from utils import FakeURLopenResponse, DataStorage
+from io import StringIO
 
 
 class TestCloudStack(unittest.TestCase):
@@ -11,8 +12,10 @@ class TestCloudStack(unittest.TestCase):
         self.urlopen_patcher = patch('urllib2.urlopen')
         self.urlopen_mock = self.urlopen_patcher.start()
         self.fixtures_dir = os.path.join(os.path.dirname(__file__), 'fixtures')
-        self.cloudmonkey_file = open(os.path.join(self.fixtures_dir, 'cloudmonkey_config'), 'r')
-        self.virtualmachines_file = open(os.path.join(self.fixtures_dir, 'virtualmachines.json'), 'r')
+        with open(os.path.join(self.fixtures_dir, 'cloudmonkey_config'), 'r') as f:
+            self.cloudmonkey_file = StringIO(unicode(f.read()))
+        with open(os.path.join(self.fixtures_dir, 'virtualmachines.json'), 'r') as f:
+            self.virtualmachines_file = StringIO(unicode(f.read()))
 
     def tearDown(self):
         self.urlopen_patcher.stop()
@@ -40,6 +43,28 @@ class TestCloudStack(unittest.TestCase):
         expected_call = self.urlopen_mock.call_args[0][0]
         self.assertIn("projectid=abcde12345", expected_call)
         self.assertEqual(self.urlopen_mock.call_count, 1)
+
+    @patch('__builtin__.open')
+    def test_set_foobar_as_default_region(self, open_mock):
+        cloudmonkey_data = self.cloudmonkey_file.read()
+        open_mock.side_effect = [StringIO(cloudmonkey_data), DataStorage(cloudmonkey_data),
+                                 DataStorage()]
+        cloudstack_handler = CloudStack('foobar', set_default_region='foobar')
+        self.assertIn(u"[default_region]\nregion = foobar", DataStorage.last_read_data)
+
+    @patch('__builtin__.open')
+    def test_set_foobar_as_default_region_and_default_projectid(self, open_mock):
+        cloudmonkey_data = self.cloudmonkey_file.read()
+        open_mock.side_effect = [DataStorage(cloudmonkey_data), DataStorage(),
+                                 DataStorage(), DataStorage(), DataStorage()]
+        response_data = '{"listprojectsresponse":{"project":[{"name": "project_x", "id": "12345678"}]}}'
+        self.urlopen_mock.return_value = FakeURLopenResponse(response_data)
+        cloudstack_handler = CloudStack('foobar', set_default_region='foobar', set_project_id=True,
+                                        project_name='project_X')
+        expected_default_id = ('[foobar]\nurl = http://foo.bar:8080/client/api\napikey = 123456'
+                               '\nsecretkey = abcdef\nprojectid = 12345678\n\n')
+        self.assertIn(expected_default_id, DataStorage.last_read_data)
+        self.assertIn(u"[default_region]\nregion = foobar", DataStorage.last_read_data)
 
     @patch('__builtin__.open')
     def test_get_all_machine_data(self, open_mock):
