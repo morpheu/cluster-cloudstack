@@ -62,7 +62,8 @@ def _get_machines_data(search_item=None):
         return machines
     for machine in virtual_machines['listvirtualmachinesresponse']['virtualmachine']:
         machine_data = {'name': machine['displayname'], 'id': machine['id'],
-                        'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename']}
+                        'ipaddress': machine['nic'][0]['ipaddress'], 'zonename': machine['zonename'],
+                        'offering': machine['serviceofferingname']}
         machines.append(machine_data)
         if search_item in [item for item in machine_data.values()]:
             search_result.append(machine_data)
@@ -124,10 +125,10 @@ def get_machine_info(args):
         sys.exit(2)
     search_item = args[0]
     machines = _get_machines_data(search_item)
-    print "{:50s} {:18s} {:36s} {:36s}".format("Display Name", "IP Address", "VM ID", "Zone Name")
+    print "{:50s} {:18s} {:36s} {:36s} {:36s}".format("Display Name", "IP Address", "VM ID", "Offering", "Zone Name")
     for machine in sorted(machines, key=lambda k: k['zonename']):
-        print "{:50s} {:18s} {:36s} {:36s}".format(machine['name'], machine['ipaddress'],
-                                                   machine['id'], machine['zonename'])
+        print "{:50s} {:18s} {:36s} {:36s} {:36s}".format(machine['name'], machine['ipaddress'],
+                                                   machine['id'], machine['offering'], machine['zonename'])
 
 def list_networks(args):
     networks = _list_networks()
